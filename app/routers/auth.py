@@ -36,6 +36,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(user: UserCreate):
+    from datetime import datetime
     db = get_database()
 
     # Check if user already exists
@@ -58,6 +59,7 @@ async def register(user: UserCreate):
         "share_ovulation": True,
         "share_notes": True,
     }
+    user_dict["created_at"] = datetime.now().isoformat()
 
     result = db.users.insert_one(user_dict)
     created_user = db.users.find_one({"_id": result.inserted_id})
