@@ -31,17 +31,15 @@ class UserCreate(UserBase):
 
 
 class UserInDB(UserBase):
-    id: Optional[PyObjectId] = Field(alias="_id", default=None)
+    id: Optional[str] = None
     hashed_password: str
     partner_id: Optional[str] = None
     qr_code_token: Optional[str] = None
     sharing_settings: dict = {"share_periods": True, "share_ovulation": True, "share_notes": True}
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: str
 
     class Config:
         populate_by_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
 
 
 class UserResponse(UserBase):

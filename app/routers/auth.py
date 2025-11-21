@@ -16,6 +16,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 
 def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
+    from bson import ObjectId
     user_id = decode_access_token(token)
     if user_id is None:
         raise HTTPException(
@@ -25,12 +26,15 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
         )
 
     db = get_database()
-    user = db.users.find_one({"_id": user_id})
+    user = db.users.find_one({"_id": ObjectId(user_id)})
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
         )
+
+    # Convert ObjectId to string for Pydantic
+    user["id"] = str(user["_id"])
     return UserInDB(**user)
 
 
