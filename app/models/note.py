@@ -28,13 +28,13 @@ class EmojiNote(BaseModel):
 
 class NoteBase(BaseModel):
     user_id: str
-    note_date: date
+    date: date
     text: Optional[str] = None
     emoji_notes: List[EmojiNote] = []
 
 
 class NoteCreate(BaseModel):
-    note_date: date
+    date: date
     text: Optional[str] = None
     emoji_notes: List[EmojiNote] = []
 
@@ -58,7 +58,7 @@ class NoteInDB(NoteBase):
 class NoteResponse(BaseModel):
     id: str
     user_id: str
-    note_date: date
+    date: date
     text: Optional[str]
     emoji_notes: List[EmojiNote]
     created_at: datetime

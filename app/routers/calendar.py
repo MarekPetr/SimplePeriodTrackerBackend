@@ -41,13 +41,14 @@ def get_month_data(
     # Get all notes for this month
     notes_cursor = db.notes.find({
         "user_id": current_user.id,
-        "note_date": {
+        "date": {
             "$gte": first_day_dt,
             "$lte": last_day_dt
         }
     })
     notes = list(notes_cursor)
-    note_dates = {note["note_date"] for note in notes}
+    # Convert datetime objects to date objects for comparison
+    note_dates = {note["date"].date() if isinstance(note["date"], datetime) else note["date"] for note in notes}
 
     # Build day info array
     day_info_list = []
