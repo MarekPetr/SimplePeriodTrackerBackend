@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import List, Dict, Optional
 
 
@@ -60,10 +60,10 @@ class CycleCalculator:
             prioritize_actual: If True, actual (ended) cycles take priority over predictions
         """
         for cycle in cycles:
-            cycle_start = cycle.get("start_date")
-            cycle_end = cycle.get("end_date")
-            period_length = cycle.get("period_length", 5)
-            cycle_length = cycle.get("cycle_length", 28)
+            cycle_start: datetime = cycle.get("start_date")
+            cycle_end: datetime = cycle.get("end_date")
+            period_length: int = cycle.get("period_length", 5)
+            cycle_length: int = cycle.get("cycle_length", 28)
 
             if not cycle_start:
                 continue
@@ -71,7 +71,7 @@ class CycleCalculator:
             # Check period days (only for actual cycles with end_date)
             if cycle_end:
                 period_days = CycleCalculator.calculate_period_days(
-                    cycle_start, period_length
+                    cycle_start.date(), period_length
                 )
                 if target_date in period_days:
                     return "period"
@@ -79,14 +79,14 @@ class CycleCalculator:
             # Check ovulation days
             if cycle_length:
                 ovulation_days = CycleCalculator.calculate_ovulation_days(
-                    cycle_start, cycle_length
+                    cycle_start.date(), cycle_length
                 )
                 if target_date in ovulation_days:
                     return "ovulation"
 
                 # Check fertile days
                 fertile_days = CycleCalculator.calculate_fertile_days(
-                    cycle_start, cycle_length
+                    cycle_start.date(), cycle_length
                 )
                 if target_date in fertile_days:
                     return "fertile"
@@ -125,13 +125,15 @@ class CycleCalculator:
 
         # Start predictions from the last cycle
         last_cycle = cycles[0]  # Assuming sorted by date descending
-        last_start = last_cycle.get("start_date")
+        last_start: datetime = last_cycle.get("start_date")
 
         if not last_start:
             return []
 
+        last_start_date = last_start.date()
+
         predictions = []
-        current_start = last_start + timedelta(days=avg_cycle_length)
+        current_start = last_start_date + timedelta(days=avg_cycle_length)
 
         for _ in range(num_predictions):
             predicted_end = current_start + timedelta(days=avg_period_length - 1)

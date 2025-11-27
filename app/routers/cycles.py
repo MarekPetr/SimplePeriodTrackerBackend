@@ -19,12 +19,28 @@ def create_cycle(
     """Create a new cycle (log period start)."""
     # Create new cycle
     cycle_dict = cycle_data.model_dump()
+
+    # Convert date to datetime for MongoDB
+    if cycle_dict.get("start_date"):
+        start_date = cycle_dict["start_date"]
+        cycle_dict["start_date"] = datetime.combine(start_date, datetime.min.time())
+
+    if cycle_dict.get("end_date"):
+        end_date = cycle_dict["end_date"]
+        cycle_dict["end_date"] = datetime.combine(end_date, datetime.min.time())
+
     cycle_dict["user_id"] = current_user.id
     cycle_dict["is_predicted"] = False
     cycle_dict["created_at"] = datetime.utcnow()
 
+    # Set default values for optional fields
+    if "cycle_length" not in cycle_dict:
+        cycle_dict["cycle_length"] = None
+    if "period_length" not in cycle_dict:
+        cycle_dict["period_length"] = None
+
     # Calculate period_length if end_date is provided
-    if cycle_dict.get("end_date"):
+    if cycle_dict.get("end_date") and cycle_dict.get("start_date"):
         cycle_dict["period_length"] = (cycle_dict["end_date"] - cycle_dict["start_date"]).days + 1
 
     result = db.cycles.insert_one(cycle_dict)
@@ -71,6 +87,15 @@ def update_cycle(
 
     # Update cycle
     update_dict = cycle_data.model_dump(exclude_unset=True)
+
+    # Convert date to datetime for MongoDB
+    if update_dict.get("start_date"):
+        start_date = update_dict["start_date"]
+        update_dict["start_date"] = datetime.combine(start_date, datetime.min.time())
+
+    if update_dict.get("end_date"):
+        end_date = update_dict["end_date"]
+        update_dict["end_date"] = datetime.combine(end_date, datetime.min.time())
 
     # Calculate period_length if end_date is provided
     if update_dict.get("end_date") and update_dict.get("start_date"):
