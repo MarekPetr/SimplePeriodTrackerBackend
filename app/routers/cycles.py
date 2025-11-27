@@ -61,6 +61,11 @@ def get_cycles(
 
     for cycle in cycles:
         cycle["id"] = str(cycle["_id"])
+        # Ensure optional fields exist
+        if "cycle_length" not in cycle:
+            cycle["cycle_length"] = None
+        if "period_length" not in cycle:
+            cycle["period_length"] = None
 
     return [CycleResponse(**cycle) for cycle in cycles]
 
@@ -108,6 +113,11 @@ def update_cycle(
 
     updated_cycle = db.cycles.find_one({"_id": ObjectId(cycle_id)})
     updated_cycle["id"] = str(updated_cycle["_id"])
+    # Ensure optional fields exist
+    if "cycle_length" not in updated_cycle:
+        updated_cycle["cycle_length"] = None
+    if "period_length" not in updated_cycle:
+        updated_cycle["period_length"] = None
     return CycleResponse(**updated_cycle)
 
 
