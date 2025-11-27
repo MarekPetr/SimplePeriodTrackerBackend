@@ -34,11 +34,10 @@ def get_month_data(
     cycles_cursor = db.cycles.find({"user_id": current_user.id}).sort("start_date", -1)
     cycles = list(cycles_cursor)
 
-    # Convert date objects to datetime for MongoDB query
+    # Get all notes for this month
     first_day_dt = datetime.combine(first_day, datetime.min.time())
     last_day_dt = datetime.combine(last_day, datetime.max.time())
 
-    # Get all notes for this month
     notes_cursor = db.notes.find({
         "user_id": current_user.id,
         "date": {
@@ -47,8 +46,8 @@ def get_month_data(
         }
     })
     notes = list(notes_cursor)
-    # Convert datetime objects to date objects for comparison
-    note_dates = {note["date"].date() if isinstance(note["date"], datetime) else note["date"] for note in notes}
+    # Extract just the date part from datetime for comparison
+    note_dates = {note["date"].date() for note in notes}
 
     # Build day info array
     day_info_list = []

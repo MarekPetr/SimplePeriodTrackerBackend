@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from datetime import date, datetime
+from datetime import datetime
 from bson import ObjectId
 
 
@@ -28,13 +28,13 @@ class EmojiNote(BaseModel):
 
 class NoteBase(BaseModel):
     user_id: str
-    date: date
+    date: datetime
     text: Optional[str] = None
     emoji_notes: List[EmojiNote] = []
 
 
 class NoteCreate(BaseModel):
-    date: date
+    date: datetime
     text: Optional[str] = None
     emoji_notes: List[EmojiNote] = []
 
@@ -58,7 +58,7 @@ class NoteInDB(NoteBase):
 class NoteResponse(BaseModel):
     id: str
     user_id: str
-    date: date
+    date: datetime
     text: Optional[str]
     emoji_notes: List[EmojiNote]
     created_at: datetime
