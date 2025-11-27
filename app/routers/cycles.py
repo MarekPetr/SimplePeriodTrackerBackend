@@ -70,7 +70,7 @@ def get_cycles(
     return [CycleResponse(**cycle) for cycle in cycles]
 
 
-@router.put("/{cycle_id}", response_model=CycleResponse)
+@router.put("/{cycle_id}", response_model=CycleResponse | None)
 def update_cycle(
     cycle_id: str,
     cycle_data: CycleCreate,
@@ -106,6 +106,13 @@ def update_cycle(
     if update_dict.get("end_date") and update_dict.get("start_date"):
         update_dict["period_length"] = (update_dict["end_date"] - update_dict["start_date"]).days + 1
 
+    if update_dict["period_length"] == 0:
+        db.cycles.delete_one({
+            "_id": ObjectId(cycle_id),
+            "user_id": current_user.id
+        })
+        return None
+    
     db.cycles.update_one(
         {"_id": ObjectId(cycle_id)},
         {"$set": update_dict}
