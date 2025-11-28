@@ -8,9 +8,9 @@ class UserService:
     """Service for user-related operations."""
 
     @staticmethod
-    def get_user_by_id(db, user_id: str) -> Optional[UserInDB]:
+    async def get_user_by_id(db, user_id: str) -> Optional[UserInDB]:
         """Get user by ID from database."""
-        user = db.users.find_one({"_id": ObjectId(user_id)})
+        user = await db.users.find_one({"_id": ObjectId(user_id)})
         if not user:
             return None
 
@@ -18,9 +18,9 @@ class UserService:
         return UserInDB(**user)
 
     @staticmethod
-    def get_user_by_email(db, email: str) -> Optional[UserInDB]:
+    async def get_user_by_email(db, email: str) -> Optional[UserInDB]:
         """Get user by email from database."""
-        user = db.users.find_one({"email": email})
+        user = await db.users.find_one({"email": email})
         if not user:
             return None
 
@@ -28,7 +28,7 @@ class UserService:
         return UserInDB(**user)
 
     @staticmethod
-    def get_user_from_token(db, token: str) -> Optional[UserInDB]:
+    async def get_user_from_token(db, token: str) -> Optional[UserInDB]:
         """
         Get user from JWT token.
         Validates token and retrieves user from database.
@@ -37,4 +37,4 @@ class UserService:
         if user_id is None:
             return None
 
-        return UserService.get_user_by_id(db, user_id)
+        return await UserService.get_user_by_id(db, user_id)

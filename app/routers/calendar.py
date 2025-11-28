@@ -10,7 +10,7 @@ router = APIRouter(prefix="/calendar", tags=["calendar"])
 
 
 @router.get("/month", response_model=List[Dict[str, Any]])
-def get_month_data(
+async def get_month_data(
     year: int = Query(..., ge=2000, le=2100),
     month: int = Query(..., ge=1, le=12),
     current_user: UserInDB = Depends(get_current_user),
@@ -32,7 +32,7 @@ def get_month_data(
 
     # Get all cycles for this user (sorted by most recent first)
     cycles_cursor = db.cycles.find({"user_id": current_user.id}).sort("start_date", -1)
-    cycles = list(cycles_cursor)
+    cycles = await cycles_cursor.to_list(length=None)
 
     # Get all notes for this month
     first_day_dt = datetime.combine(first_day, datetime.min.time())
@@ -45,7 +45,7 @@ def get_month_data(
             "$lte": last_day_dt
         }
     })
-    notes = list(notes_cursor)
+    notes = await notes_cursor.to_list(length=None)
     # Extract just the date part from datetime for comparison
     note_dates = {note["date"].date() for note in notes}
 

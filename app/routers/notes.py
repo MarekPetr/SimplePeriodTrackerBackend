@@ -10,13 +10,13 @@ router = APIRouter(prefix="/notes", tags=["notes"])
 
 
 @router.get("/{date}", response_model=NoteResponse)
-def get_note_by_date(
+async def get_note_by_date(
     date: datetime,
     current_user: UserInDB = Depends(get_current_user),
     db=Depends(get_database),
 ):
     """Get note for a specific date."""
-    note = db.notes.find_one({
+    note = await db.notes.find_one({
         "user_id": current_user.id,
         "date": date
     })
@@ -32,14 +32,14 @@ def get_note_by_date(
 
 
 @router.post("", response_model=NoteResponse, status_code=status.HTTP_201_CREATED)
-def create_note(
+async def create_note(
     note_data: NoteCreate,
     current_user: UserInDB = Depends(get_current_user),
     db=Depends(get_database),
 ):
     """Create a new note for a specific date."""
     # Check if note already exists for this date
-    existing_note = db.notes.find_one({
+    existing_note = await db.notes.find_one({
         "user_id": current_user.id,
         "date": note_data.date
     })
@@ -56,15 +56,15 @@ def create_note(
     note_dict["created_at"] = datetime.utcnow()
     note_dict["updated_at"] = datetime.utcnow()
 
-    result = db.notes.insert_one(note_dict)
-    created_note = db.notes.find_one({"_id": result.inserted_id})
+    result = await db.notes.insert_one(note_dict)
+    created_note = await db.notes.find_one({"_id": result.inserted_id})
 
     created_note["id"] = str(created_note["_id"])
     return NoteResponse(**created_note)
 
 
 @router.put("/{date}", response_model=NoteResponse)
-def update_note(
+async def update_note(
     date: datetime,
     note_data: NoteUpdate,
     current_user: UserInDB = Depends(get_current_user),
@@ -72,7 +72,7 @@ def update_note(
 ):
     """Update an existing note."""
     # Find the note
-    existing_note = db.notes.find_one({
+    existing_note = await db.notes.find_one({
         "user_id": current_user.id,
         "date": date
     })
@@ -87,24 +87,24 @@ def update_note(
     update_dict = note_data.model_dump(exclude_unset=True)
     update_dict["updated_at"] = datetime.utcnow()
 
-    db.notes.update_one(
+    await db.notes.update_one(
         {"_id": existing_note["_id"]},
         {"$set": update_dict}
     )
 
-    updated_note = db.notes.find_one({"_id": existing_note["_id"]})
+    updated_note = await db.notes.find_one({"_id": existing_note["_id"]})
     updated_note["id"] = str(updated_note["_id"])
     return NoteResponse(**updated_note)
 
 
 @router.delete("/{date}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_note(
+async def delete_note(
     date: datetime,
     current_user: UserInDB = Depends(get_current_user),
     db=Depends(get_database),
 ):
     """Delete a note for a specific date."""
-    result = db.notes.delete_one({
+    result = await db.notes.delete_one({
         "user_id": current_user.id,
         "date": date
     })

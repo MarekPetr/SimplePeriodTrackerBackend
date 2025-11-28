@@ -1,7 +1,7 @@
-from pymongo import MongoClient
+from pymongo import AsyncMongoClient
 from app.core.config import settings
 
-client = MongoClient(settings.mongodb_url)
+client = AsyncMongoClient(settings.mongodb_url)
 db = client[settings.database_name]
 
 

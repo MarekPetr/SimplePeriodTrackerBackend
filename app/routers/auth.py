@@ -17,7 +17,7 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 
-def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
     from bson import ObjectId
     user_id = decode_access_token(token)
     if user_id is None:
@@ -28,7 +28,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
         )
 
     db = get_database()
-    user = db.users.find_one({"_id": ObjectId(user_id)})
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -46,7 +46,7 @@ async def register(user: UserCreate):
     db = get_database()
 
     # Check if user already exists
-    if db.users.find_one({"email": user.email}):
+    if await db.users.find_one({"email": user.email}):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered"
         )
@@ -67,8 +67,8 @@ async def register(user: UserCreate):
     }
     user_dict["created_at"] = datetime.now().isoformat()
 
-    result = db.users.insert_one(user_dict)
-    created_user = db.users.find_one({"_id": result.inserted_id})
+    result = await db.users.insert_one(user_dict)
+    created_user = await db.users.find_one({"_id": result.inserted_id})
 
     return UserResponse(
         id=str(created_user["_id"]),
@@ -83,7 +83,7 @@ async def register(user: UserCreate):
 @router.post("/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     db = get_database()
-    user = db.users.find_one({"email": form_data.username})
+    user = await db.users.find_one({"email": form_data.username})
 
     if not user or not verify_password(form_data.password, user["hashed_password"]):
         raise HTTPException(
@@ -153,6 +153,6 @@ async def update_sharing_settings(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid sharing settings"
         )
 
-    db.users.update_one({"_id": current_user.id}, {"$set": {"sharing_settings": settings}})
+    await db.users.update_one({"_id": current_user.id}, {"$set": {"sharing_settings": settings}})
 
     return {"message": "Sharing settings updated successfully"}
