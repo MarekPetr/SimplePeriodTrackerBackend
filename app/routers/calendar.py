@@ -34,7 +34,7 @@ async def get_month_data(
     first_day_dt = datetime.combine(first_day, datetime.min.time())
     last_day_dt = datetime.combine(last_day, datetime.max.time())
 
-    # Get all actual cycles for this user (sorted by date ascending for prediction)
+    # Get all cycles for this user within the current month (sorted by date ascending for prediction)
     cycles_cursor = db.cycles.find(
         {"user_id": current_user.id, "is_predicted": False, "start_date": { "$lte": last_day_dt }, "end_date": { "$gte": first_day_dt} }
     ).sort("start_date", 1)
