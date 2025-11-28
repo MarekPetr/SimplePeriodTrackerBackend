@@ -14,17 +14,8 @@ class CycleCalculator:
         return [cycle_start + timedelta(days=i) for i in range(period_length)]
 
     @staticmethod
-    def calculate_ovulation_days(cycle_start: date, cycle_length: int = 28) -> List[date]:
-        """
-        Calculate ovulation days (3-day window around ovulation).
-        Ovulation typically occurs 14 days before the next period.
-        """
-        ovulation_day = cycle_start + timedelta(days=cycle_length - 14)
-        return [
-            ovulation_day - timedelta(days=1),
-            ovulation_day,
-            ovulation_day + timedelta(days=1),
-        ]
+    def calculate_ovulation_day(cycle_start: date, cycle_length: int = 28) -> List[date]:
+        return cycle_start + timedelta(days=cycle_length - 14)
 
     @staticmethod
     def calculate_fertile_days(cycle_start: date, cycle_length: int = 28) -> List[date]:
@@ -62,8 +53,8 @@ class CycleCalculator:
         for cycle in cycles:
             cycle_start: datetime = cycle.get("start_date")
             cycle_end: datetime = cycle.get("end_date")
-            period_length: int = cycle.get("period_length", 5)
-            cycle_length: int = cycle.get("cycle_length", 28)
+            period_length: int = cycle.get("period_length") or 5
+            cycle_length: int = cycle.get("cycle_length") or 28
 
             if not cycle_start:
                 continue
@@ -78,10 +69,10 @@ class CycleCalculator:
 
             # Check ovulation days
             if cycle_length:
-                ovulation_days = CycleCalculator.calculate_ovulation_days(
+                ovulation_day = CycleCalculator.calculate_ovulation_day(
                     cycle_start.date(), cycle_length
                 )
-                if target_date in ovulation_days:
+                if target_date == ovulation_day:
                     return "ovulation"
 
                 # Check fertile days
@@ -94,56 +85,53 @@ class CycleCalculator:
         return None
 
     @staticmethod
-    def predict_next_cycles(
+    def predict_next_cycle(
         cycles: List[Dict],
-        num_predictions: int = 3
-    ) -> List[Dict]:
+    ) -> Dict:
         """
-        Predict the next N cycles based on historical data.
-        This is a simple average-based prediction that can be replaced with AI.
+        Predict cycles that fall within the target month based on historical data.
+        Uses average of last 3 cycle lengths for prediction.
 
-        Returns list of predicted cycles with start_date, predicted_end, cycle_length
+        Args:
+            cycles: List of actual cycle dictionaries (sorted by date ascending)
+
+        Returns list of predicted cycles with start_date, end_date, period_length, is_predicted
         """
         if not cycles:
-            return []
+            return {}
 
-        # Calculate average cycle length from historical data
-        cycle_lengths = [
-            c.get("cycle_length") for c in cycles if c.get("cycle_length")
-        ]
-        avg_cycle_length = (
-            sum(cycle_lengths) // len(cycle_lengths) if cycle_lengths else 28
-        )
+        # Calculate cycle lengths between consecutive cycles
+        cycle_lengths = []
+        for i in range(1, len(cycles)):
+            prev_start = cycles[i-1].get("start_date")
+            curr_start = cycles[i].get("start_date")
+            if prev_start and curr_start:
+                cycle_length = (curr_start - prev_start).days
+                if cycle_length > 0:
+                    cycle_lengths.append(cycle_length)
+
+        # Calculate average of last 3 cycle lengths
+        avg_cycle_length = 28  # Default
+        if cycle_lengths:
+            last_3_lengths = cycle_lengths[-3:] if len(cycle_lengths) >= 3 else cycle_lengths
+            avg_cycle_length = sum(last_3_lengths) // len(last_3_lengths)
 
         # Calculate average period length
-        period_lengths = [
-            c.get("period_length") for c in cycles if c.get("period_length")
-        ]
-        avg_period_length = (
-            sum(period_lengths) // len(period_lengths) if period_lengths else 5
-        )
+        period_lengths = [c.get("period_length") for c in cycles if c.get("period_length")]
+        avg_period_length = sum(period_lengths) // len(period_lengths) if period_lengths else 5
 
-        # Start predictions from the last cycle
-        last_cycle = cycles[0]  # Assuming sorted by date descending
+        # Start predictions from the last actual cycle
+        last_cycle = cycles[-1]  # Last cycle (sorted ascending)
         last_start: datetime = last_cycle.get("start_date")
 
         if not last_start:
-            return []
+            return {}
 
-        last_start_date = last_start.date()
-
-        predictions = []
-        current_start = last_start_date + timedelta(days=avg_cycle_length)
-
-        for _ in range(num_predictions):
-            predicted_end = current_start + timedelta(days=avg_period_length - 1)
-            predictions.append({
-                "start_date": current_start,
-                "predicted_end": predicted_end,
-                "cycle_length": avg_cycle_length,
-                "period_length": avg_period_length,
-                "is_predicted": True,
-            })
-            current_start += timedelta(days=avg_cycle_length)
-
-        return predictions
+        next_start = last_start + timedelta(days=avg_cycle_length)
+        predicted_end = next_start + timedelta(days=avg_period_length - 1)
+        return {
+            "start_date": next_start,
+            "end_date": predicted_end,
+            "period_length": avg_period_length,
+            "is_predicted": True
+        }

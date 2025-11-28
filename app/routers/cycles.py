@@ -5,6 +5,7 @@ from app.core.dependencies import get_current_user
 from app.core.database import get_database
 from app.models.user import UserInDB
 from app.models.cycle import CycleCreate, CycleResponse
+from app.services.cycle_calculator import CycleCalculator
 from typing import List
 
 router = APIRouter(prefix="/cycles", tags=["cycles"])

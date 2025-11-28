@@ -29,14 +29,26 @@ async def get_month_data(
         last_day = date(year + 1, 1, 1) - timedelta(days=1)
     else:
         last_day = date(year, month + 1, 1) - timedelta(days=1)
-
-    # Get all cycles for this user (sorted by most recent first)
-    cycles_cursor = db.cycles.find({"user_id": current_user.id}).sort("start_date", -1)
-    cycles = await cycles_cursor.to_list(length=None)
-
+    
     # Get all notes for this month
     first_day_dt = datetime.combine(first_day, datetime.min.time())
     last_day_dt = datetime.combine(last_day, datetime.max.time())
+
+    # Get all actual cycles for this user (sorted by date ascending for prediction)
+    cycles_cursor = db.cycles.find(
+        {"user_id": current_user.id, "is_predicted": False, "start_date": { "$lte": last_day_dt }, "end_date": { "$gte": first_day_dt} }
+    ).sort("start_date", 1)
+
+    actual_cycles = await cycles_cursor.to_list(length=None)
+
+    # Generate predictions for this month
+    predicted_cycle: dict = CycleCalculator.predict_next_cycle(
+        actual_cycles,
+    )
+    # Combine actual and predicted cycles
+    cycles: list = actual_cycles
+    if predicted_cycle:
+        cycles.append(predicted_cycle)
 
     notes_cursor = db.notes.find({
         "user_id": current_user.id,
@@ -49,18 +61,32 @@ async def get_month_data(
     # Extract just the date part from datetime for comparison
     note_dates = {note["date"].date() for note in notes}
 
+    if predicted_cycle:
+        # Build set of predicted period days for fast lookup
+        predicted_period_days = set()
+        cycle_start: datetime = predicted_cycle["start_date"]
+        cycle_end: datetime = predicted_cycle.get("end_date")
+        if cycle_start and cycle_end:
+            period_days = CycleCalculator.calculate_period_days(
+                cycle_start.date(),
+                predicted_cycle.get("period_length", 5)
+            )
+            predicted_period_days.update(period_days)
+
     # Build day info array
     day_info_list = []
     current_day = first_day
-
+    
     while current_day <= last_day:
         # Use CycleCalculator to determine day type
         day_type = CycleCalculator.get_day_type(current_day, cycles)
+        # Check if this is a predicted period day
+        is_predicted = day_type == "period" and current_day in predicted_period_days
 
         day_info = {
             "date": current_day.isoformat(),
             "type": day_type,
-            "isPredicted": False,  # TODO: Determine if from predicted cycle
+            "isPredicted": is_predicted,
             "hasNote": current_day in note_dates
         }
 
