@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from datetime import timedelta
-from app.models.user import UserCreate, UserInDB, UserResponse, Token
+from app.models.user import UserCreate, UserInDB, UserResponse, Token, RefreshTokenRequest
 from app.core.security import (
     verify_password,
     get_password_hash,
@@ -106,8 +106,8 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
 
 @router.post("/refresh", response_model=Token)
-async def refresh_token(refresh_token: str):
-    user_id = decode_refresh_token(refresh_token)
+async def refresh_token(request: RefreshTokenRequest):
+    user_id = decode_refresh_token(request.refresh_token)
     if user_id is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
