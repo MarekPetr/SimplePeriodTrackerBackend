@@ -6,7 +6,9 @@ from app.core.security import (
     verify_password,
     get_password_hash,
     create_access_token,
+    create_refresh_token,
     decode_access_token,
+    decode_refresh_token,
 )
 from app.core.database import get_database
 from app.core.config import settings
@@ -94,8 +96,36 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     access_token = create_access_token(
         data={"sub": str(user["_id"])}, expires_delta=access_token_expires
     )
+    refresh_token = create_refresh_token(data={"sub": str(user["_id"])})
 
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer"
+    }
+
+
+@router.post("/refresh", response_model=Token)
+async def refresh_token(refresh_token: str):
+    user_id = decode_refresh_token(refresh_token)
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
+    access_token = create_access_token(
+        data={"sub": user_id}, expires_delta=access_token_expires
+    )
+    new_refresh_token = create_refresh_token(data={"sub": user_id})
+
+    return {
+        "access_token": access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer"
+    }
 
 
 @router.get("/me", response_model=UserResponse)
