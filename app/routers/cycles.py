@@ -22,13 +22,13 @@ async def create_cycle(
     cycle_dict = cycle_data.model_dump()
 
     # Convert date to datetime for MongoDB
-    if cycle_dict.get("start_date"):
-        start_date = cycle_dict["start_date"]
-        cycle_dict["start_date"] = datetime.combine(start_date, datetime.min.time())
+    if cycle_dict.get("period_start_date"):
+        period_start_date = cycle_dict["period_start_date"]
+        cycle_dict["period_start_date"] = datetime.combine(period_start_date, datetime.min.time())
 
-    if cycle_dict.get("end_date"):
-        end_date = cycle_dict["end_date"]
-        cycle_dict["end_date"] = datetime.combine(end_date, datetime.min.time())
+    if cycle_dict.get("period_end_date"):
+        period_end_date = cycle_dict["period_end_date"]
+        cycle_dict["period_end_date"] = datetime.combine(period_end_date, datetime.min.time())
 
     cycle_dict["user_id"] = current_user.id
     cycle_dict["is_predicted"] = False
@@ -40,9 +40,9 @@ async def create_cycle(
     if "period_length" not in cycle_dict:
         cycle_dict["period_length"] = None
 
-    # Calculate period_length if end_date is provided
-    if cycle_dict.get("end_date") and cycle_dict.get("start_date"):
-        cycle_dict["period_length"] = (cycle_dict["end_date"] - cycle_dict["start_date"]).days + 1
+    # Calculate period_length if period_end_date is provided
+    if cycle_dict.get("period_end_date") and cycle_dict.get("period_start_date"):
+        cycle_dict["period_length"] = (cycle_dict["period_end_date"] - cycle_dict["period_start_date"]).days + 1
 
     result = await db.cycles.insert_one(cycle_dict)
     created_cycle = await db.cycles.find_one({"_id": result.inserted_id})
@@ -57,7 +57,7 @@ async def get_cycles(
     db=Depends(get_database),
 ):
     """Get all cycles for the current user."""
-    cycles_cursor = db.cycles.find({"user_id": current_user.id}).sort("start_date", -1)
+    cycles_cursor = db.cycles.find({"user_id": current_user.id}).sort("period_start_date", -1)
     cycles = await cycles_cursor.to_list(length=None)
 
     for cycle in cycles:
@@ -95,17 +95,17 @@ async def update_cycle(
     update_dict = cycle_data.model_dump(exclude_unset=True)
 
     # Convert date to datetime for MongoDB
-    if update_dict.get("start_date"):
-        start_date = update_dict["start_date"]
-        update_dict["start_date"] = datetime.combine(start_date, datetime.min.time())
+    if update_dict.get("period_start_date"):
+        period_start_date = update_dict["period_start_date"]
+        update_dict["period_start_date"] = datetime.combine(period_start_date, datetime.min.time())
 
-    if update_dict.get("end_date"):
-        end_date = update_dict["end_date"]
-        update_dict["end_date"] = datetime.combine(end_date, datetime.min.time())
+    if update_dict.get("period_end_date"):
+        period_end_date = update_dict["period_end_date"]
+        update_dict["period_end_date"] = datetime.combine(period_end_date, datetime.min.time())
 
-    # Calculate period_length if end_date is provided
-    if update_dict.get("end_date") and update_dict.get("start_date"):
-        update_dict["period_length"] = (update_dict["end_date"] - update_dict["start_date"]).days + 1
+    # Calculate period_length if period_end_date is provided
+    if update_dict.get("period_end_date") and update_dict.get("period_start_date"):
+        update_dict["period_length"] = (update_dict["period_end_date"] - update_dict["period_start_date"]).days + 1
 
     if update_dict["period_length"] == 0:
         await db.cycles.delete_one({

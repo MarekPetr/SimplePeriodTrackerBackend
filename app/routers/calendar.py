@@ -36,8 +36,8 @@ async def get_month_data(
 
     # Get all cycles for this user within the current month (sorted by date ascending for prediction)
     cycles_cursor = db.cycles.find(
-        {"user_id": current_user.id, "is_predicted": False, "start_date": { "$lte": last_day_dt }, "end_date": { "$gte": first_day_dt} }
-    ).sort("start_date", 1)
+        {"user_id": current_user.id, "is_predicted": False, "period_start_date": { "$lte": last_day_dt }, "period_end_date": { "$gte": first_day_dt} }
+    ).sort("period_start_date", 1)
 
     actual_cycles = await cycles_cursor.to_list(length=None)
 
@@ -64,8 +64,8 @@ async def get_month_data(
     if predicted_cycle:
         # Build set of predicted period days for fast lookup
         predicted_period_days = set()
-        cycle_start: datetime = predicted_cycle["start_date"]
-        cycle_end: datetime = predicted_cycle.get("end_date")
+        cycle_start: datetime = predicted_cycle["period_start_date"]
+        cycle_end: datetime = predicted_cycle.get("period_end_date")
         if cycle_start and cycle_end:
             period_days = CycleCalculator.calculate_period_days(
                 cycle_start.date(),

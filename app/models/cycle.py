@@ -23,15 +23,15 @@ class PyObjectId(ObjectId):
 
 class CycleBase(BaseModel):
     user_id: str
-    start_date: date
-    end_date: Optional[date] = None
+    period_start_date: date
+    period_end_date: Optional[date] = None
     cycle_length: Optional[int] = None
     period_length: Optional[int] = None
 
 
 class CycleCreate(BaseModel):
-    start_date: date
-    end_date: Optional[date] = None
+    period_start_date: date
+    period_end_date: Optional[date] = None
 
 
 class CycleInDB(CycleBase):
@@ -47,8 +47,8 @@ class CycleInDB(CycleBase):
 class CycleResponse(BaseModel):
     id: str
     user_id: str
-    start_date: date
-    end_date: Optional[date]
+    period_start_date: date
+    period_end_date: Optional[date]
     cycle_length: Optional[int]
     period_length: Optional[int]
     created_at: datetime

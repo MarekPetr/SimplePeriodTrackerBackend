@@ -47,19 +47,19 @@ class CycleCalculator:
 
         Args:
             target_date: The date to check
-            cycles: List of cycle dictionaries with start_date, end_date, cycle_length, period_length
+            cycles: List of cycle dictionaries with period_start_date, period_end_date, cycle_length, period_length
             prioritize_actual: If True, actual (ended) cycles take priority over predictions
         """
         for cycle in cycles:
-            cycle_start: datetime = cycle.get("start_date")
-            cycle_end: datetime = cycle.get("end_date")
+            cycle_start: datetime = cycle.get("period_start_date")
+            cycle_end: datetime = cycle.get("period_end_date")
             period_length: int = cycle.get("period_length") or 5
             cycle_length: int = cycle.get("cycle_length") or 28
 
             if not cycle_start:
                 continue
 
-            # Check period days (only for actual cycles with end_date)
+            # Check period days (only for actual cycles with period_end_date)
             if cycle_end:
                 period_days = CycleCalculator.calculate_period_days(
                     cycle_start.date(), period_length
@@ -95,7 +95,7 @@ class CycleCalculator:
         Args:
             cycles: List of actual cycle dictionaries (sorted by date ascending)
 
-        Returns list of predicted cycles with start_date, end_date, period_length, is_predicted
+        Returns list of predicted cycles with period_start_date, period_end_date, period_length, is_predicted
         """
         if not cycles:
             return {}
@@ -103,8 +103,8 @@ class CycleCalculator:
         # Calculate cycle lengths between consecutive cycles
         cycle_lengths = []
         for i in range(1, len(cycles)):
-            prev_start = cycles[i-1].get("start_date")
-            curr_start = cycles[i].get("start_date")
+            prev_start = cycles[i-1].get("period_start_date")
+            curr_start = cycles[i].get("period_start_date")
             if prev_start and curr_start:
                 cycle_length = (curr_start - prev_start).days
                 if cycle_length > 0:
@@ -122,7 +122,7 @@ class CycleCalculator:
 
         # Start predictions from the last actual cycle
         last_cycle = cycles[-1]  # Last cycle (sorted ascending)
-        last_start: datetime = last_cycle.get("start_date")
+        last_start: datetime = last_cycle.get("period_start_date")
 
         if not last_start:
             return {}
@@ -130,8 +130,8 @@ class CycleCalculator:
         next_start = last_start + timedelta(days=avg_cycle_length)
         predicted_end = next_start + timedelta(days=avg_period_length - 1)
         return {
-            "start_date": next_start,
-            "end_date": predicted_end,
+            "period_start_date": next_start,
+            "period_end_date": predicted_end,
             "period_length": avg_period_length,
             "is_predicted": True
         }
