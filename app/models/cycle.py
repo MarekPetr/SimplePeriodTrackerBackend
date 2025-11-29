@@ -56,9 +56,3 @@ class CycleResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
-class PredictionResponse(BaseModel):
-    predicted_start: date
-    predicted_end: date
-    ovulation_start: date
-    ovulation_end: date
