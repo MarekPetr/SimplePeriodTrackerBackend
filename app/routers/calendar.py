@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from typing import List, Dict, Any
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_current_user
@@ -33,8 +33,8 @@ async def get_month_data(
     else:
         last_day = date(year, month + 1, 1) - timedelta(days=1)
 
-    first_day_dt = datetime.combine(first_day, datetime.min.time())
-    last_day_dt = datetime.combine(last_day, datetime.max.time())
+    first_day_dt = datetime.combine(first_day, datetime.min.time(), tzinfo=timezone.utc)
+    last_day_dt = datetime.combine(last_day, datetime.max.time(), tzinfo=timezone.utc)
 
     # Get all cycles for this user within the current month (sorted by date ascending for prediction)
     stmt = (

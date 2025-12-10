@@ -1,6 +1,6 @@
 import pytest
 from httpx import AsyncClient
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class TestCreateNote:
@@ -10,7 +10,7 @@ class TestCreateNote:
     async def test_create_note_success(self, client: AsyncClient, auth_headers: dict):
         """Test successful note creation."""
         note_data = {
-            "date": datetime.utcnow().isoformat(),
+            "date": datetime.now(timezone.utc).isoformat(),
             "text": "Feeling great today!",
             "emoji_notes": [
                 {"emoji": "😊", "description": "Happy"},
@@ -30,7 +30,7 @@ class TestCreateNote:
     @pytest.mark.asyncio
     async def test_create_note_minimal(self, client: AsyncClient, auth_headers: dict):
         """Test creating note with minimal data."""
-        note_data = {"date": datetime.utcnow().isoformat(), "emoji_notes": []}
+        note_data = {"date": datetime.now(timezone.utc).isoformat(), "emoji_notes": []}
 
         response = await client.post("/notes", json=note_data, headers=auth_headers)
 
@@ -44,7 +44,7 @@ class TestCreateNote:
         self, client: AsyncClient, auth_headers: dict
     ):
         """Test that creating duplicate note for same date fails."""
-        note_date = datetime.utcnow().isoformat()
+        note_date = datetime.now(timezone.utc).isoformat()
         note_data = {"date": note_date, "text": "First note"}
 
         # Create first note
@@ -61,7 +61,7 @@ class TestCreateNote:
     @pytest.mark.asyncio
     async def test_create_note_unauthorized(self, client: AsyncClient):
         """Test creating note without authentication fails."""
-        note_data = {"date": datetime.utcnow().isoformat(), "text": "Test"}
+        note_data = {"date": datetime.now(timezone.utc).isoformat(), "text": "Test"}
 
         response = await client.post("/notes", json=note_data)
 
@@ -75,7 +75,7 @@ class TestGetNote:
     async def test_get_note_success(self, client: AsyncClient, auth_headers: dict):
         """Test successfully retrieving a note."""
         # Create a note
-        note_date = datetime.utcnow()
+        note_date = datetime.now(timezone.utc)
         note_data = {
             "date": note_date.isoformat(),
             "text": "Test note",
@@ -104,7 +104,7 @@ class TestGetNote:
     @pytest.mark.asyncio
     async def test_get_note_unauthorized(self, client: AsyncClient):
         """Test getting note without authentication fails."""
-        response = await client.get(f"/notes/{datetime.utcnow().isoformat()}")
+        response = await client.get(f"/notes/{datetime.now(timezone.utc).isoformat()}")
 
         assert response.status_code == 401
 
@@ -116,7 +116,7 @@ class TestUpdateNote:
     async def test_update_note_success(self, client: AsyncClient, auth_headers: dict):
         """Test successful note update."""
         # Create a note
-        note_date = datetime.utcnow()
+        note_date = datetime.now(timezone.utc)
         note_data = {"date": note_date.isoformat(), "text": "Original text"}
         await client.post("/notes", json=note_data, headers=auth_headers)
 
@@ -141,7 +141,7 @@ class TestUpdateNote:
     async def test_update_note_partial(self, client: AsyncClient, auth_headers: dict):
         """Test partial note update (only updating text)."""
         # Create a note
-        note_date = datetime.utcnow()
+        note_date = datetime.now(timezone.utc)
         note_data = {
             "date": note_date.isoformat(),
             "text": "Original",
@@ -182,7 +182,7 @@ class TestUpdateNote:
         """Test updating note without authentication fails."""
         update_data = {"text": "New text"}
         response = await client.put(
-            f"/notes/{datetime.utcnow().isoformat()}", json=update_data
+            f"/notes/{datetime.now(timezone.utc).isoformat()}", json=update_data
         )
 
         assert response.status_code == 401
@@ -195,7 +195,7 @@ class TestDeleteNote:
     async def test_delete_note_success(self, client: AsyncClient, auth_headers: dict):
         """Test successful note deletion."""
         # Create a note
-        note_date = datetime.utcnow()
+        note_date = datetime.now(timezone.utc)
         note_data = {"date": note_date.isoformat(), "text": "To be deleted"}
         await client.post("/notes", json=note_data, headers=auth_headers)
 
@@ -225,7 +225,7 @@ class TestDeleteNote:
     @pytest.mark.asyncio
     async def test_delete_note_unauthorized(self, client: AsyncClient):
         """Test deleting note without authentication fails."""
-        response = await client.delete(f"/notes/{datetime.utcnow().isoformat()}")
+        response = await client.delete(f"/notes/{datetime.now(timezone.utc).isoformat()}")
 
         assert response.status_code == 401
 
@@ -251,7 +251,7 @@ class TestNoteAuthorization:
         headers1 = {"Authorization": f"Bearer {token1}"}
 
         # Create note for user1
-        note_date = datetime.utcnow()
+        note_date = datetime.now(timezone.utc)
         note_data = {"date": note_date.isoformat(), "text": "User1's private note"}
         await client.post("/notes", json=note_data, headers=headers1)
 

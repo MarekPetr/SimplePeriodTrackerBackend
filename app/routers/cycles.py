@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_current_user
@@ -23,16 +23,18 @@ async def create_cycle(
     # Create new cycle
     cycle_dict = cycle_data.model_dump()
 
-    # Convert date to datetime for database
+    # Convert date to datetime for database (using UTC)
     if cycle_dict.get("period_start_date"):
         period_start_date = cycle_dict["period_start_date"]
         cycle_dict["period_start_date"] = datetime.combine(
-            period_start_date, datetime.min.time()
+            period_start_date, datetime.min.time(), tzinfo=timezone.utc
         )
 
     if cycle_dict.get("period_end_date"):
         period_end_date = cycle_dict["period_end_date"]
-        cycle_dict["period_end_date"] = datetime.combine(period_end_date, datetime.min.time())
+        cycle_dict["period_end_date"] = datetime.combine(
+            period_end_date, datetime.min.time(), tzinfo=timezone.utc
+        )
 
     cycle_dict["user_id"] = current_user.id
     cycle_dict["is_predicted"] = False
@@ -108,16 +110,18 @@ async def update_cycle(
     # Update cycle
     update_dict = cycle_data.model_dump(exclude_unset=True)
 
-    # Convert date to datetime for database
+    # Convert date to datetime for database (using UTC)
     if update_dict.get("period_start_date"):
         period_start_date = update_dict["period_start_date"]
         update_dict["period_start_date"] = datetime.combine(
-            period_start_date, datetime.min.time()
+            period_start_date, datetime.min.time(), tzinfo=timezone.utc
         )
 
     if update_dict.get("period_end_date"):
         period_end_date = update_dict["period_end_date"]
-        update_dict["period_end_date"] = datetime.combine(period_end_date, datetime.min.time())
+        update_dict["period_end_date"] = datetime.combine(
+            period_end_date, datetime.min.time(), tzinfo=timezone.utc
+        )
 
     # Calculate period_length if period_end_date is provided
     if update_dict.get("period_end_date") and update_dict.get("period_start_date"):

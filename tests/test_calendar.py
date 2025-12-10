@@ -1,6 +1,6 @@
 import pytest
 from httpx import AsyncClient
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 
 class TestGetMonthData:
@@ -62,7 +62,7 @@ class TestGetMonthData:
         """Test calendar data with notes."""
         # Create a note in January 2025
         note_data = {
-            "date": datetime(2025, 1, 15).isoformat(),
+            "date": datetime(2025, 1, 15, tzinfo=timezone.utc).isoformat(),
             "text": "Test note",
         }
         await client.post("/notes", json=note_data, headers=auth_headers)
@@ -98,8 +98,8 @@ class TestGetMonthData:
 
         # Create notes on some period days and some other days
         note_dates = [
-            datetime(2025, 2, 12).isoformat(),  # During period
-            datetime(2025, 2, 20).isoformat(),  # After period
+            datetime(2025, 2, 12, tzinfo=timezone.utc).isoformat(),  # During period
+            datetime(2025, 2, 20, tzinfo=timezone.utc).isoformat(),  # After period
         ]
         for note_date in note_dates:
             await client.post(
