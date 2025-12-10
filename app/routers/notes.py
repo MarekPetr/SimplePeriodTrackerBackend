@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_current_user
@@ -116,7 +116,7 @@ async def update_note(
         ]
 
     # Set updated_at timestamp (will be handled by onupdate in the model, but set here explicitly)
-    update_dict["updated_at"] = datetime.utcnow()
+    update_dict["updated_at"] = datetime.now(timezone.utc)
 
     stmt = update(Note).where(Note.id == existing_note.id).values(**update_dict)
     await db.execute(stmt)

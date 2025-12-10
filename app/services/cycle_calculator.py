@@ -54,7 +54,7 @@ class CycleCalculator:
             cycle_start: datetime = cycle.get("period_start_date")
             cycle_end: datetime = cycle.get("period_end_date")
             period_length: int = cycle.get("period_length") or 5
-            cycle_length: int = cycle.get("cycle_length") or 28
+            cycle_length: int = cycle.get("cycle_length")  # Don't default to 28
 
             if not cycle_start:
                 continue
@@ -67,7 +67,7 @@ class CycleCalculator:
                 if target_date in period_days:
                     return "period"
 
-            # Check ovulation days
+            # Check ovulation and fertile days only if cycle_length is explicitly set
             if cycle_length:
                 ovulation_day = CycleCalculator.calculate_ovulation_day(
                     cycle_start.date(), cycle_length

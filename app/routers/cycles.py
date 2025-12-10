@@ -107,58 +107,49 @@ async def update_cycle(
             status_code=status.HTTP_404_NOT_FOUND, detail="Cycle not found"
         )
 
-    # Update cycle
+    # Update cycle using object attributes
     update_dict = cycle_data.model_dump(exclude_unset=True)
 
-    # Convert date to datetime for database (using UTC)
-    if update_dict.get("period_start_date"):
+    # Convert date to datetime for database (using UTC) and update object
+    if "period_start_date" in update_dict:
         period_start_date = update_dict["period_start_date"]
-        update_dict["period_start_date"] = datetime.combine(
+        existing_cycle.period_start_date = datetime.combine(
             period_start_date, datetime.min.time(), tzinfo=timezone.utc
         )
 
-    if update_dict.get("period_end_date"):
+    if "period_end_date" in update_dict:
         period_end_date = update_dict["period_end_date"]
-        update_dict["period_end_date"] = datetime.combine(
+        existing_cycle.period_end_date = datetime.combine(
             period_end_date, datetime.min.time(), tzinfo=timezone.utc
         )
 
-    # Calculate period_length if period_end_date is provided
-    if update_dict.get("period_end_date") and update_dict.get("period_start_date"):
-        update_dict["period_length"] = (
-            update_dict["period_end_date"] - update_dict["period_start_date"]
+    # Calculate period_length if both dates are set
+    if existing_cycle.period_end_date and existing_cycle.period_start_date:
+        period_length = (
+            existing_cycle.period_end_date - existing_cycle.period_start_date
         ).days + 1
 
-    if update_dict.get("period_length") == 0:
-        # Delete cycle if period_length is 0
-        stmt = delete(Cycle).where(Cycle.id == cycle_id, Cycle.user_id == current_user.id)
-        await db.execute(stmt)
-        await db.commit()
-        return None
+        if period_length == 0:
+            # Delete cycle if period_length is 0
+            await db.delete(existing_cycle)
+            await db.commit()
+            return None
 
-    stmt = (
-        update(Cycle)
-        .where(Cycle.id == cycle_id)
-        .values(**update_dict)
-    )
-    await db.execute(stmt)
+        existing_cycle.period_length = period_length
+
     await db.commit()
-
-    # Fetch updated cycle
-    stmt = select(Cycle).where(Cycle.id == cycle_id)
-    result = await db.execute(stmt)
-    updated_cycle = result.scalar_one()
+    await db.refresh(existing_cycle)
 
     return CycleResponse(
-        id=str(updated_cycle.id),
-        user_id=str(updated_cycle.user_id),
-        period_start_date=updated_cycle.period_start_date.date(),
+        id=str(existing_cycle.id),
+        user_id=str(existing_cycle.user_id),
+        period_start_date=existing_cycle.period_start_date.date(),
         period_end_date=(
-            updated_cycle.period_end_date.date() if updated_cycle.period_end_date else None
+            existing_cycle.period_end_date.date() if existing_cycle.period_end_date else None
         ),
-        cycle_length=updated_cycle.cycle_length,
-        period_length=updated_cycle.period_length,
-        created_at=updated_cycle.created_at,
+        cycle_length=existing_cycle.cycle_length,
+        period_length=existing_cycle.period_length,
+        created_at=existing_cycle.created_at,
     )
 
 

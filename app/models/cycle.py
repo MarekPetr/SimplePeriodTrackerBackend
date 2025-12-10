@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 
 class CycleBase(BaseModel):
@@ -18,7 +18,7 @@ class CycleCreate(BaseModel):
 
 class CycleInDB(CycleBase):
     id: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.now(timezone.utc))
 
     class Config:
         populate_by_name = True
