@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from datetime import datetime, date
-from bson import ObjectId
+from sqlalchemy import select, update, delete
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_current_user
-from app.core.database import get_database
+from app.db.session import get_db
+from app.db.models import Cycle
 from app.models.user import UserInDB
 from app.models.cycle import CycleCreate, CycleResponse
 from app.services.cycle_calculator import CycleCalculator
@@ -15,16 +17,18 @@ router = APIRouter(prefix="/cycles", tags=["cycles"])
 async def create_cycle(
     cycle_data: CycleCreate,
     current_user: UserInDB = Depends(get_current_user),
-    db=Depends(get_database),
+    db: AsyncSession = Depends(get_db),
 ):
     """Create a new cycle (log period start)."""
     # Create new cycle
     cycle_dict = cycle_data.model_dump()
 
-    # Convert date to datetime for MongoDB
+    # Convert date to datetime for database
     if cycle_dict.get("period_start_date"):
         period_start_date = cycle_dict["period_start_date"]
-        cycle_dict["period_start_date"] = datetime.combine(period_start_date, datetime.min.time())
+        cycle_dict["period_start_date"] = datetime.combine(
+            period_start_date, datetime.min.time()
+        )
 
     if cycle_dict.get("period_end_date"):
         period_end_date = cycle_dict["period_end_date"]
@@ -32,43 +36,55 @@ async def create_cycle(
 
     cycle_dict["user_id"] = current_user.id
     cycle_dict["is_predicted"] = False
-    cycle_dict["created_at"] = datetime.utcnow()
-
-    # Set default values for optional fields
-    if "cycle_length" not in cycle_dict:
-        cycle_dict["cycle_length"] = None
-    if "period_length" not in cycle_dict:
-        cycle_dict["period_length"] = None
 
     # Calculate period_length if period_end_date is provided
     if cycle_dict.get("period_end_date") and cycle_dict.get("period_start_date"):
-        cycle_dict["period_length"] = (cycle_dict["period_end_date"] - cycle_dict["period_start_date"]).days + 1
+        cycle_dict["period_length"] = (
+            cycle_dict["period_end_date"] - cycle_dict["period_start_date"]
+        ).days + 1
 
-    result = await db.cycles.insert_one(cycle_dict)
-    created_cycle = await db.cycles.find_one({"_id": result.inserted_id})
+    new_cycle = Cycle(**cycle_dict)
+    db.add(new_cycle)
+    await db.commit()
+    await db.refresh(new_cycle)
 
-    created_cycle["id"] = str(created_cycle["_id"])
-    return CycleResponse(**created_cycle)
+    return CycleResponse(
+        id=str(new_cycle.id),
+        user_id=str(new_cycle.user_id),
+        period_start_date=new_cycle.period_start_date.date(),
+        period_end_date=new_cycle.period_end_date.date() if new_cycle.period_end_date else None,
+        cycle_length=new_cycle.cycle_length,
+        period_length=new_cycle.period_length,
+        created_at=new_cycle.created_at,
+    )
 
 
 @router.get("", response_model=List[CycleResponse])
 async def get_cycles(
     current_user: UserInDB = Depends(get_current_user),
-    db=Depends(get_database),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get all cycles for the current user."""
-    cycles_cursor = db.cycles.find({"user_id": current_user.id}).sort("period_start_date", -1)
-    cycles = await cycles_cursor.to_list(length=None)
+    stmt = (
+        select(Cycle)
+        .where(Cycle.user_id == current_user.id)
+        .order_by(Cycle.period_start_date.desc())
+    )
+    result = await db.execute(stmt)
+    cycles = result.scalars().all()
 
-    for cycle in cycles:
-        cycle["id"] = str(cycle["_id"])
-        # Ensure optional fields exist
-        if "cycle_length" not in cycle:
-            cycle["cycle_length"] = None
-        if "period_length" not in cycle:
-            cycle["period_length"] = None
-
-    return [CycleResponse(**cycle) for cycle in cycles]
+    return [
+        CycleResponse(
+            id=str(c.id),
+            user_id=str(c.user_id),
+            period_start_date=c.period_start_date.date(),
+            period_end_date=c.period_end_date.date() if c.period_end_date else None,
+            cycle_length=c.cycle_length,
+            period_length=c.period_length,
+            created_at=c.created_at,
+        )
+        for c in cycles
+    ]
 
 
 @router.put("/{cycle_id}", response_model=CycleResponse | None)
@@ -76,28 +92,28 @@ async def update_cycle(
     cycle_id: str,
     cycle_data: CycleCreate,
     current_user: UserInDB = Depends(get_current_user),
-    db=Depends(get_database),
+    db: AsyncSession = Depends(get_db),
 ):
     """Update an existing cycle (e.g., log period end)."""
     # Find the cycle
-    existing_cycle = await db.cycles.find_one({
-        "_id": ObjectId(cycle_id),
-        "user_id": current_user.id
-    })
+    stmt = select(Cycle).where(Cycle.id == cycle_id, Cycle.user_id == current_user.id)
+    result = await db.execute(stmt)
+    existing_cycle = result.scalar_one_or_none()
 
     if not existing_cycle:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cycle not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cycle not found"
         )
 
     # Update cycle
     update_dict = cycle_data.model_dump(exclude_unset=True)
 
-    # Convert date to datetime for MongoDB
+    # Convert date to datetime for database
     if update_dict.get("period_start_date"):
         period_start_date = update_dict["period_start_date"]
-        update_dict["period_start_date"] = datetime.combine(period_start_date, datetime.min.time())
+        update_dict["period_start_date"] = datetime.combine(
+            period_start_date, datetime.min.time()
+        )
 
     if update_dict.get("period_end_date"):
         period_end_date = update_dict["period_end_date"]
@@ -105,46 +121,57 @@ async def update_cycle(
 
     # Calculate period_length if period_end_date is provided
     if update_dict.get("period_end_date") and update_dict.get("period_start_date"):
-        update_dict["period_length"] = (update_dict["period_end_date"] - update_dict["period_start_date"]).days + 1
+        update_dict["period_length"] = (
+            update_dict["period_end_date"] - update_dict["period_start_date"]
+        ).days + 1
 
-    if update_dict["period_length"] == 0:
-        await db.cycles.delete_one({
-            "_id": ObjectId(cycle_id),
-            "user_id": current_user.id
-        })
+    if update_dict.get("period_length") == 0:
+        # Delete cycle if period_length is 0
+        stmt = delete(Cycle).where(Cycle.id == cycle_id, Cycle.user_id == current_user.id)
+        await db.execute(stmt)
+        await db.commit()
         return None
 
-    await db.cycles.update_one(
-        {"_id": ObjectId(cycle_id)},
-        {"$set": update_dict}
+    stmt = (
+        update(Cycle)
+        .where(Cycle.id == cycle_id)
+        .values(**update_dict)
     )
+    await db.execute(stmt)
+    await db.commit()
 
-    updated_cycle = await db.cycles.find_one({"_id": ObjectId(cycle_id)})
-    updated_cycle["id"] = str(updated_cycle["_id"])
-    # Ensure optional fields exist
-    if "cycle_length" not in updated_cycle:
-        updated_cycle["cycle_length"] = None
-    if "period_length" not in updated_cycle:
-        updated_cycle["period_length"] = None
-    return CycleResponse(**updated_cycle)
+    # Fetch updated cycle
+    stmt = select(Cycle).where(Cycle.id == cycle_id)
+    result = await db.execute(stmt)
+    updated_cycle = result.scalar_one()
+
+    return CycleResponse(
+        id=str(updated_cycle.id),
+        user_id=str(updated_cycle.user_id),
+        period_start_date=updated_cycle.period_start_date.date(),
+        period_end_date=(
+            updated_cycle.period_end_date.date() if updated_cycle.period_end_date else None
+        ),
+        cycle_length=updated_cycle.cycle_length,
+        period_length=updated_cycle.period_length,
+        created_at=updated_cycle.created_at,
+    )
 
 
 @router.delete("/{cycle_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_cycle(
     cycle_id: str,
     current_user: UserInDB = Depends(get_current_user),
-    db=Depends(get_database),
+    db: AsyncSession = Depends(get_db),
 ):
     """Delete a cycle."""
-    result = await db.cycles.delete_one({
-        "_id": ObjectId(cycle_id),
-        "user_id": current_user.id
-    })
+    stmt = delete(Cycle).where(Cycle.id == cycle_id, Cycle.user_id == current_user.id)
+    result = await db.execute(stmt)
+    await db.commit()
 
-    if result.deleted_count == 0:
+    if result.rowcount == 0:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cycle not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cycle not found"
         )
 
     return None

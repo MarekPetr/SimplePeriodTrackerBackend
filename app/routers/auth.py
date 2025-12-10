@@ -1,6 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from datetime import timedelta
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.db.models import User
+from app.db.session import get_db
 from app.models.user import UserCreate, UserInDB, UserResponse, Token, RefreshTokenRequest
 from app.core.security import (
     verify_password,
@@ -10,15 +14,15 @@ from app.core.security import (
     decode_access_token,
     decode_refresh_token,
 )
-from app.core.database import get_database
 from app.core.config import settings
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
-    from bson import ObjectId
+async def get_current_user(
+    token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)
+) -> UserInDB:
     user_id = decode_access_token(token)
     if user_id is None:
         raise HTTPException(
@@ -27,26 +31,36 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserInDB:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    db = get_database()
-    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    stmt = select(User).where(User.id == user_id)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
         )
 
-    # Convert ObjectId to string for Pydantic
-    user["id"] = str(user["_id"])
-    return UserInDB(**user)
+    return UserInDB(
+        id=str(user.id),
+        email=user.email,
+        gender=user.gender,
+        hashed_password=user.hashed_password,
+        partner_id=str(user.partner_id) if user.partner_id else None,
+        qr_code_token=user.qr_code_token,
+        sharing_settings=user.sharing_settings,
+        created_at=user.created_at,
+    )
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register(user: UserCreate):
-    from datetime import datetime
-    db = get_database()
-
+async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
     # Check if user already exists
-    if await db.users.find_one({"email": user.email}):
+    stmt = select(User).where(User.email == user.email)
+    result = await db.execute(stmt)
+    existing_user = result.scalar_one_or_none()
+
+    if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered"
         )
@@ -60,32 +74,31 @@ async def register(user: UserCreate):
     # Create user
     user_dict = user.model_dump()
     user_dict["hashed_password"] = get_password_hash(user_dict.pop("password"))
-    user_dict["sharing_settings"] = {
-        "share_periods": True,
-        "share_ovulation": True,
-        "share_notes": True,
-    }
-    user_dict["created_at"] = datetime.now().isoformat()
 
-    result = await db.users.insert_one(user_dict)
-    created_user = await db.users.find_one({"_id": result.inserted_id})
+    new_user = User(**user_dict)
+    db.add(new_user)
+    await db.commit()
+    await db.refresh(new_user)
 
     return UserResponse(
-        id=str(created_user["_id"]),
-        email=created_user["email"],
-        gender=created_user["gender"],
-        partner_id=created_user.get("partner_id"),
-        sharing_settings=created_user["sharing_settings"],
-        created_at=created_user["created_at"],
+        id=str(new_user.id),
+        email=new_user.email,
+        gender=new_user.gender,
+        partner_id=str(new_user.partner_id) if new_user.partner_id else None,
+        sharing_settings=new_user.sharing_settings,
+        created_at=new_user.created_at,
     )
 
 
 @router.post("/login", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    db = get_database()
-    user = await db.users.find_one({"email": form_data.username})
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)
+):
+    stmt = select(User).where(User.email == form_data.username)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
 
-    if not user or not verify_password(form_data.password, user["hashed_password"]):
+    if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -94,14 +107,14 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
     access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
     access_token = create_access_token(
-        data={"sub": str(user["_id"])}, expires_delta=access_token_expires
+        data={"sub": str(user.id)}, expires_delta=access_token_expires
     )
-    refresh_token = create_refresh_token(data={"sub": str(user["_id"])})
+    refresh_token = create_refresh_token(data={"sub": str(user.id)})
 
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
     }
 
 
@@ -124,7 +137,7 @@ async def refresh_token(request: RefreshTokenRequest):
     return {
         "access_token": access_token,
         "refresh_token": new_refresh_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
     }
 
 
@@ -142,10 +155,10 @@ async def get_current_user_info(current_user: UserInDB = Depends(get_current_use
 
 @router.put("/sharing-settings")
 async def update_sharing_settings(
-    settings: dict, current_user: UserInDB = Depends(get_current_user)
+    settings: dict,
+    current_user: UserInDB = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    db = get_database()
-
     # Validate settings
     valid_keys = {"share_periods", "share_ovulation", "share_notes"}
     if not all(key in valid_keys for key in settings.keys()):
@@ -153,6 +166,8 @@ async def update_sharing_settings(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid sharing settings"
         )
 
-    await db.users.update_one({"_id": current_user.id}, {"$set": {"sharing_settings": settings}})
+    stmt = update(User).where(User.id == current_user.id).values(sharing_settings=settings)
+    await db.execute(stmt)
+    await db.commit()
 
     return {"message": "Sharing settings updated successfully"}

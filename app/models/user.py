@@ -1,24 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import datetime
-from bson import ObjectId
-
-
-class PyObjectId(ObjectId):
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
-
-    @classmethod
-    def validate(cls, v):
-        if not ObjectId.is_valid(v):
-            raise ValueError("Invalid objectid")
-        return ObjectId(v)
-
-    @classmethod
-    def __get_pydantic_json_schema__(cls, schema):
-        schema.update(type="string")
-        return schema
 
 
 class UserBase(BaseModel):
@@ -36,7 +18,7 @@ class UserInDB(UserBase):
     partner_id: Optional[str] = None
     qr_code_token: Optional[str] = None
     sharing_settings: dict = {"share_periods": True, "share_ovulation": True, "share_notes": True}
-    created_at: str
+    created_at: datetime
 
     class Config:
         populate_by_name = True
