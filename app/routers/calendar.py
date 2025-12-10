@@ -30,7 +30,6 @@ async def get_month_data(
     else:
         last_day = date(year, month + 1, 1) - timedelta(days=1)
     
-    # Get all notes for this month
     first_day_dt = datetime.combine(first_day, datetime.min.time())
     last_day_dt = datetime.combine(last_day, datetime.max.time())
 
@@ -41,14 +40,8 @@ async def get_month_data(
 
     actual_cycles = await cycles_cursor.to_list(length=None)
 
-    # Generate predictions for this month
-    predicted_cycle: dict = CycleCalculator.predict_next_cycle(
-        actual_cycles,
-    )
     # Combine actual and predicted cycles
     cycles: list = actual_cycles
-    if predicted_cycle:
-        cycles.append(predicted_cycle)
 
     notes_cursor = db.notes.find({
         "user_id": current_user.id,
@@ -61,18 +54,6 @@ async def get_month_data(
     # Extract just the date part from datetime for comparison
     note_dates = {note["date"].date() for note in notes}
 
-    if predicted_cycle:
-        # Build set of predicted period days for fast lookup
-        predicted_period_days = set()
-        cycle_start: datetime = predicted_cycle["period_start_date"]
-        cycle_end: datetime = predicted_cycle.get("period_end_date")
-        if cycle_start and cycle_end:
-            period_days = CycleCalculator.calculate_period_days(
-                cycle_start.date(),
-                predicted_cycle.get("period_length", 5)
-            )
-            predicted_period_days.update(period_days)
-
     # Build day info array
     day_info_list = []
     current_day = first_day
@@ -80,13 +61,9 @@ async def get_month_data(
     while current_day <= last_day:
         # Use CycleCalculator to determine day type
         day_type = CycleCalculator.get_day_type(current_day, cycles)
-        # Check if this is a predicted period day
-        is_predicted = day_type == "period" and current_day in predicted_period_days
-
         day_info = {
             "date": current_day.isoformat(),
             "type": day_type,
-            "isPredicted": is_predicted,
             "hasNote": current_day in note_dates
         }
 
