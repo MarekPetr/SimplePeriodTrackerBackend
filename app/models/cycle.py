@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 from datetime import date, datetime, timezone
 
@@ -17,14 +17,15 @@ class CycleCreate(BaseModel):
 
 
 class CycleInDB(CycleBase):
+    model_config = ConfigDict(populate_by_name=True)
+    
     id: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.now(timezone.utc))
 
-    class Config:
-        populate_by_name = True
-
 
 class CycleResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    
     id: str
     user_id: str
     period_start_date: date
@@ -32,7 +33,3 @@ class CycleResponse(BaseModel):
     cycle_length: Optional[int]
     period_length: Optional[int]
     created_at: datetime
-
-    class Config:
-        from_attributes = True
-

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr
 from typing import Optional
 from datetime import datetime
 
@@ -13,6 +13,8 @@ class UserCreate(UserBase):
 
 
 class UserInDB(UserBase):
+    model_config = ConfigDict(populate_by_name=True)
+    
     id: Optional[str] = None
     hashed_password: str
     partner_id: Optional[str] = None
@@ -20,18 +22,14 @@ class UserInDB(UserBase):
     sharing_settings: dict = {"share_periods": True, "share_ovulation": True, "share_notes": True}
     created_at: datetime
 
-    class Config:
-        populate_by_name = True
-
 
 class UserResponse(UserBase):
+    model_config = ConfigDict(populate_by_name=True)
+    
     id: str
     partner_id: Optional[str] = None
     sharing_settings: dict
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class Token(BaseModel):
