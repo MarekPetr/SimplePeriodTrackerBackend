@@ -22,9 +22,9 @@ class TestGetMonthData:
         data = response.json()
         # January 2025 has 31 days
         assert len(data) == 31
-        # All days should have type "normal" and no notes
+        # All days should have type None (no special type) and no notes
         for day in data:
-            assert day["type"] == "normal"
+            assert day["type"] is None
             assert day["hasNote"] == False
 
     @pytest.mark.asyncio
@@ -121,7 +121,7 @@ class TestGetMonthData:
 
         # Check non-period day with note
         feb_20 = next(d for d in data if d["date"] == "2025-02-20")
-        assert feb_20["type"] == "normal"  # Not a period day
+        assert feb_20["type"] is None  # Not a period day
         assert feb_20["hasNote"] == True
 
     @pytest.mark.asyncio
