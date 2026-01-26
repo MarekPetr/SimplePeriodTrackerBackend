@@ -1,11 +1,23 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import auth, calendar, notes, cycles
+from app.db.session import engine
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    yield
+    # Shutdown
+    await engine.dispose()
+
 
 app = FastAPI(
     title="SimplePeriodTracker API",
     description="API for period tracking application",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # Configure CORS

@@ -1,24 +1,6 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
-from datetime import datetime
-from bson import ObjectId
-
-
-class PyObjectId(ObjectId):
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
-
-    @classmethod
-    def validate(cls, v):
-        if not ObjectId.is_valid(v):
-            raise ValueError("Invalid objectid")
-        return ObjectId(v)
-
-    @classmethod
-    def __get_pydantic_json_schema__(cls, schema):
-        schema.update(type="string")
-        return schema
+from datetime import datetime, timezone
 
 
 class EmojiNote(BaseModel):
@@ -45,17 +27,16 @@ class NoteUpdate(BaseModel):
 
 
 class NoteInDB(NoteBase):
-    id: Optional[PyObjectId] = Field(alias="_id", default=None)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    model_config = ConfigDict(populate_by_name=True)
 
-    class Config:
-        populate_by_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
+    id: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=datetime.now(timezone.utc))
 
 
 class NoteResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     user_id: str
     date: datetime
@@ -63,6 +44,3 @@ class NoteResponse(BaseModel):
     emoji_notes: List[EmojiNote]
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
